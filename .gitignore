@@ -1,0 +1,15 @@
+node_modules/
+dist/
+release/
+artifacts/
+.npm-cache/
+
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local Codex project notes
+AGENTS.md
+design-qa.md
