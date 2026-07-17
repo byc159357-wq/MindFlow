@@ -75,13 +75,53 @@ app.whenReady().then(async () => {
       await pressToolbar('列表');
       const list = editor.querySelectorAll('ul li').length === 2;
 
+      await setEditorHtml('<p>First section</p><p>Second section</p>');
+      const dividerRange = document.createRange();
+      dividerRange.selectNodeContents(editor.querySelector('p'));
+      dividerRange.collapse(false);
+      const dividerSelection = window.getSelection();
+      dividerSelection.removeAllRanges();
+      dividerSelection.addRange(dividerRange);
+      editor.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      await pressToolbar('分割线');
+      const divider = Boolean(editor.querySelector('hr'));
+      const dividerStyle = getComputedStyle(editor.querySelector('hr'));
+      const dividerVisual = dividerStyle.height === '1px' && dividerStyle.backgroundColor !== 'rgba(0, 0, 0, 0)';
+      const dividerStored = (JSON.parse(localStorage.getItem('mindflow-notes') || '[]')[0]?.content || '').includes('---');
+      document.querySelector('.note-row[data-note-id="2"]').click();
+      await wait(100);
+      document.querySelector('.note-row[data-note-id="1"]').click();
+      await wait(140);
+      const dividerReloaded = Boolean(editor.querySelector('hr'));
+
+      await setEditorHtml('<p>Resize this text</p>');
+      const sizeText = editor.querySelector('p').firstChild;
+      selectText(sizeText, 0, 6);
+      document.querySelector('.format-size-select .select-menu-trigger').click();
+      await wait(80);
+      document.querySelector('.select-menu-popover [data-value="22"]').click();
+      await wait(160);
+      const sizedSpan = editor.querySelector('[data-font-size="22"]');
+      const fontSize = sizedSpan?.textContent === 'Resize' && getComputedStyle(sizedSpan).fontSize === '22px';
+      const fontPersisted = (JSON.parse(localStorage.getItem('mindflow-notes') || '[]')[0]?.content || '').includes('data-font-size="22"');
+
       await setEditorHtml('<p>Open MindFlow</p>');
       const linkText = editor.querySelector('p').firstChild;
       selectText(linkText, 5, 13);
-      window.prompt = () => 'example.com/docs';
       await pressToolbar('链接');
+      const linkInputs = document.querySelectorAll('.link-editor-popover input');
+      const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      inputSetter.call(linkInputs[1], 'example.com/docs');
+      linkInputs[1].dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('.link-editor-popover button[type="submit"]').click();
+      await wait(160);
       const anchor = editor.querySelector('a');
       const link = anchor?.textContent === 'MindFlow' && anchor.href === 'https://example.com/docs';
+      let openedLink = '';
+      window.open = (url) => { openedLink = url; return null; };
+      anchor?.click();
+      await wait(60);
+      const linkOpens = openedLink === 'https://example.com/docs';
 
       await setEditorHtml('<p>Image below</p>');
       const imageRange = document.createRange();
@@ -115,7 +155,11 @@ app.whenReady().then(async () => {
       };
       document.querySelector('.editor-more-wrap .icon-button').click();
       await wait(80);
-      [...document.querySelectorAll('.editor-more-menu button')].find((button) => button.textContent.includes('导出为 JPG')).click();
+      [...document.querySelectorAll('.editor-more-menu button')].find((button) => button.textContent.includes('另存为')).click();
+      await wait(120);
+      [...document.querySelectorAll('.save-as-formats button')].find((button) => button.textContent.includes('JPG')).click();
+      await wait(100);
+      [...document.querySelectorAll('.save-as-dialog > footer button')].find((button) => button.textContent.includes('选择位置')).click();
       await wait(4500);
       HTMLAnchorElement.prototype.click = originalClick;
       URL.createObjectURL = originalCreateObjectURL;
@@ -130,11 +174,11 @@ app.whenReady().then(async () => {
 
       const stored = JSON.parse(localStorage.getItem('mindflow-notes') || '[]')[0]?.content || '';
       const persisted = stored.includes('data:image/webp') && stored.includes('Image below');
-      return { bold, italic, italicVisual, italicToggleOff, underline, list, link, image, jpg, jpgDimensions, jpgToast, jpgError: window.__mindflowLastExportError || null, downloaded, persisted, contentEditable: editor.contentEditable };
+      return { bold, italic, italicVisual, italicToggleOff, underline, list, divider, dividerVisual, dividerStored, dividerReloaded, fontSize, fontPersisted, link, linkOpens, image, jpg, jpgDimensions, jpgToast, jpgError: window.__mindflowLastExportError || null, downloaded, persisted, contentEditable: editor.contentEditable };
     })()
   `);
 
-  const passed = result.bold && result.italic && result.italicVisual && result.italicToggleOff && result.underline && result.list && result.link && result.image && result.jpg && result.persisted && result.contentEditable === "true";
+  const passed = result.bold && result.italic && result.italicVisual && result.italicToggleOff && result.underline && result.list && result.divider && result.dividerVisual && result.dividerStored && result.dividerReloaded && result.fontSize && result.fontPersisted && result.link && result.linkOpens && result.image && result.jpg && result.persisted && result.contentEditable === "true";
   process.stdout.write(`${JSON.stringify({ passed, ...result }, null, 2)}\n`);
   app.exit(passed ? 0 : 1);
 }).catch((error) => {

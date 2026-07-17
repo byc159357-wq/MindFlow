@@ -81,10 +81,10 @@ app.whenReady().then(async () => {
     && result.listCollapse.collapsedStored
     && result.listCollapse.expandedStored
     && result.listCollapse.expandedClass
-    && result.contextLabels.length === 6
+    && result.contextLabels.length === 5
     && result.contextLabels.some((label) => label.includes("标记重点"))
-    && result.contextLabels.some((label) => label.includes("明天提醒"))
-    && result.contextLabels.some((label) => label.includes("导出为 JPG"))
+    && result.contextLabels.some((label) => label.includes("设置提醒"))
+    && result.contextLabels.some((label) => label.includes("另存为"))
     && result.contextLabels.some((label) => label.includes("删除笔记"))
     && result.secondWorkflow.title === "产品设计思路"
     && result.secondWorkflow.nodes === 2

@@ -26,7 +26,7 @@ app.whenReady().then(async () => {
   await wait(180);
   await fs.promises.mkdir(captureDirectory, { recursive: true });
 
-  const themes = ["mist", "salt", "graphite", "system"];
+  const themes = ["mist", "cream", "parchment", "glacier", "sage", "rose", "midnight", "graphite", "system"];
   const results = [];
 
   for (const theme of themes) {
@@ -81,6 +81,9 @@ app.whenReady().then(async () => {
       })()
     `);
     results.push(result);
+    // Give Chromium one compositor frame after the React state update so the
+    // visual capture and the computed theme result always describe the same theme.
+    await wait(120);
     const image = await win.webContents.capturePage();
     await fs.promises.writeFile(path.join(captureDirectory, `${theme}.png`), image.toPNG());
   }
@@ -94,6 +97,26 @@ app.whenReady().then(async () => {
     })
   `);
 
+  const legacyMigrations = [];
+  for (const [legacy, migrated] of [["salt", "glacier"], ["yolk", "parchment"]]) {
+    await win.webContents.executeJavaScript(`
+      (() => {
+        const settings = JSON.parse(localStorage.getItem('mindflow-settings') || '{}');
+        localStorage.setItem('mindflow-settings', JSON.stringify({ ...settings, theme: '${legacy}' }));
+      })()
+    `);
+    await win.reload();
+    await wait(320);
+    legacyMigrations.push(await win.webContents.executeJavaScript(`
+      ({
+        legacy: '${legacy}',
+        migrated: '${migrated}',
+        classApplied: document.querySelector('.app-shell').classList.contains('theme-${migrated}'),
+        selectedLabel: document.querySelector('.theme-option.selected .theme-option-copy strong')?.textContent || ''
+      })
+    `));
+  }
+
   const fixedThemes = results.filter((result) => result.requested !== "system");
   const uniqueAccents = new Set(fixedThemes.map((result) => result.accent)).size === fixedThemes.length;
   const passed = results.every((result) => result.classApplied
@@ -103,9 +126,10 @@ app.whenReady().then(async () => {
       && result.settingsBackground === result.panel.replace(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i, (_, r, g, b) => `rgb(${parseInt(r, 16)}, ${parseInt(g, 16)}, ${parseInt(b, 16)})`))
     && uniqueAccents
     && persisted.stored === "system"
-    && persisted.classApplied;
+    && persisted.classApplied
+    && legacyMigrations.every((result) => result.classApplied);
 
-  process.stdout.write(`${JSON.stringify({ passed, uniqueAccents, persisted, results, captureDirectory }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ passed, uniqueAccents, persisted, legacyMigrations, results, captureDirectory }, null, 2)}\n`);
   app.exit(passed ? 0 : 1);
 }).catch((error) => {
   process.stderr.write(`${error.stack || error}\n`);
