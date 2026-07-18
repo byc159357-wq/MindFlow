@@ -1,7 +1,7 @@
 {
   "name": "mindflow",
   "productName": "MindFlow",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "本地优先的笔记、任务、工作流与思维导图桌面应用",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "electron": "electron .",
     "electron:dev": "concurrently -k \"vite --host 127.0.0.1 --port 5173 --strictPort\" \"wait-on http://127.0.0.1:5173 && electron .\"",
-    "package:win": "set \"ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/\" && pnpm run build && electron-packager . MindFlow --platform=win32 --arch=x64 --out=release --overwrite --asar --icon=assets/mindflow-app-icon.ico --ignore=node_modules --ignore=src --ignore=release --ignore=scripts --ignore=artifacts --ignore=design-reference.png --ignore=design-qa.md --ignore=pnpm-lock.yaml --ignore=pnpm-workspace.yaml --ignore=AGENTS.md --app-version=1.6.0 --win32metadata.CompanyName=MindFlow --win32metadata.FileDescription=MindFlow --win32metadata.ProductName=MindFlow",
+    "package:win": "set \"ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/\" && pnpm run build && electron-packager . MindFlow --platform=win32 --arch=x64 --out=release --overwrite --asar --icon=assets/mindflow-app-icon.ico --ignore=node_modules --ignore=src --ignore=release --ignore=scripts --ignore=artifacts --ignore=design-reference.png --ignore=design-qa.md --ignore=pnpm-lock.yaml --ignore=pnpm-workspace.yaml --ignore=AGENTS.md --app-version=1.6.1 --win32metadata.CompanyName=MindFlow --win32metadata.FileDescription=MindFlow --win32metadata.ProductName=MindFlow",
     "package:delivery": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-delivery.ps1"
   },
   "dependencies": {

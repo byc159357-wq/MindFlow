@@ -2286,6 +2286,7 @@ const paintDrawingStroke = (context, stroke, width, height) => {
 function DrawingPage({ notify }) {
   const canvasRef = useRef(null);
   const sheetRef = useRef(null);
+  const cursorRef = useRef(null);
   const strokesRef = useRef([]);
   const activeStrokeRef = useRef(null);
   const animationFrameRef = useRef(null);
@@ -2298,6 +2299,7 @@ function DrawingPage({ notify }) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveFormat, setSaveFormat] = useState("png");
   const [saving, setSaving] = useState(false);
+  const activeStrokeSize = tool === "eraser" ? Math.max(12, strokeSize * 3) : strokeSize;
   strokesRef.current = strokes;
 
   const renderCanvas = useCallback((extraStroke = null) => {
@@ -2353,6 +2355,25 @@ function DrawingPage({ notify }) {
     };
   };
 
+  const hideDrawingCursor = () => {
+    if (cursorRef.current) cursorRef.current.dataset.visible = "false";
+  };
+
+  const positionDrawingCursor = (event) => {
+    const cursor = cursorRef.current;
+    const sheet = sheetRef.current;
+    if (!cursor || !sheet || event.pointerType === "touch") {
+      hideDrawingCursor();
+      return;
+    }
+    const rect = sheet.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const inside = x >= 0 && y >= 0 && x <= rect.width && y <= rect.height;
+    cursor.dataset.visible = inside ? "true" : "false";
+    if (inside) cursor.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+  };
+
   const beginStroke = (event) => {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -2360,7 +2381,7 @@ function DrawingPage({ notify }) {
       id: `stroke-${Date.now()}`,
       tool,
       color,
-      size: tool === "eraser" ? Math.max(12, strokeSize * 3) : strokeSize,
+      size: activeStrokeSize,
       points: [pointerPoint(event)],
     };
     setDrawing(true);
@@ -2477,9 +2498,27 @@ function DrawingPage({ notify }) {
           <div className="drawing-history"><button onClick={undo} disabled={!strokes.length} aria-label="撤销" title="撤销 Ctrl+Z"><ArrowCounterClockwise size={16} /></button><button onClick={redo} disabled={!redoStack.length} aria-label="重做" title="重做 Ctrl+Shift+Z"><ArrowClockwise size={16} /></button></div>
         </div>
         <div ref={sheetRef} className={`drawing-sheet ${tool === "eraser" ? "eraser-active" : ""}`}>
-          <canvas ref={canvasRef} onPointerDown={beginStroke} onPointerMove={continueStroke} onPointerUp={finishStroke} onPointerCancel={finishStroke} aria-label="绘图画布" />
+          <canvas
+            ref={canvasRef}
+            onPointerEnter={positionDrawingCursor}
+            onPointerLeave={hideDrawingCursor}
+            onPointerDown={(event) => { positionDrawingCursor(event); beginStroke(event); }}
+            onPointerMove={(event) => { positionDrawingCursor(event); continueStroke(event); }}
+            onPointerUp={(event) => { positionDrawingCursor(event); finishStroke(event); }}
+            onPointerCancel={(event) => { hideDrawingCursor(); finishStroke(event); }}
+            aria-label="绘图画布"
+          />
+          <span
+            ref={cursorRef}
+            className={`drawing-brush-cursor ${tool}`}
+            data-tool={tool}
+            data-size={activeStrokeSize}
+            data-visible="false"
+            style={{ "--drawing-cursor-size": `${activeStrokeSize}px`, "--drawing-cursor-color": color }}
+            aria-hidden="true"
+          />
           {!strokes.length && !drawing && <div className="drawing-empty"><PencilLine size={22} /><strong>在画布上拖动开始画图</strong><span>内容会自动保存在本机</span></div>}
-          <div className="drawing-canvas-status"><span>{tool === "pen" ? "画笔" : "橡皮"}</span><i />{strokeSize}px</div>
+          <div className="drawing-canvas-status"><span>{tool === "pen" ? "画笔" : "橡皮"}</span><i />{activeStrokeSize}px</div>
         </div>
       </div>
       {saveDialogOpen && (
@@ -3084,7 +3123,7 @@ function SettingsPage({ notify }) {
       const key = localStorage.key(index);
       if (key) storage[key] = localStorage.getItem(key);
     }
-    downloadFile(`MindFlow-备份-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: "MindFlow", version: "1.6.0", exportedAt: new Date().toISOString(), storage }, null, 2), "application/json");
+    downloadFile(`MindFlow-备份-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: "MindFlow", version: "1.6.1", exportedAt: new Date().toISOString(), storage }, null, 2), "application/json");
     notify("全部本地数据已导出");
   };
   const clearAllData = () => {
@@ -3132,7 +3171,7 @@ function SettingsPage({ notify }) {
       <section><h3>动态效果</h3><div className="setting-row"><label>减少动态效果<small>关闭非必要的过渡动画</small></label><input type="checkbox" checked={settings.reduceMotion} onChange={(event) => updateSetting("reduceMotion", event.target.checked)} /></div></section>
     </>,
     data: <><section><h3>本地存储</h3><div className="setting-row"><label>数据范围<small>笔记、任务和画布不会上传到云端</small></label><span className="setting-status"><Database size={14} />仅此设备</span></div></section><section><h3>备份与重置</h3><div className="data-actions"><button className="ghost-button" onClick={exportAllData}><Export size={15} />导出全部数据</button><button className="danger-button" onClick={clearAllData}><Trash size={15} />清除本地数据</button></div></section></>,
-    about: <section className="about-section"><span className="about-mark"><img src={mindFlowAppIcon} alt="" /></span><div><h3>MindFlow 1.6.0</h3><p>一个本地优先的记录、任务与可视化整理工具。</p><span>笔记、任务、桌面挂件、工作流和思维导图都只保存在你的电脑上。</span></div></section>,
+    about: <section className="about-section"><span className="about-mark"><img src={mindFlowAppIcon} alt="" /></span><div><h3>MindFlow 1.6.1</h3><p>一个本地优先的记录、任务与可视化整理工具。</p><span>笔记、任务、桌面挂件、工作流和思维导图都只保存在你的电脑上。</span></div></section>,
   };
   return (
     <section className="settings-page">

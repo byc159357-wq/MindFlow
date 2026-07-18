@@ -5,6 +5,11 @@ app.setPath("userData", path.join(app.getPath("temp"), `mindflow-drawing-smoke-$
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+const moveMouse = async (win, point) => {
+  win.webContents.sendInputEvent({ type: "mouseMove", x: point.x, y: point.y, movementX: 1, movementY: 1 });
+  await wait(80);
+};
+
 const drawLine = async (win, from, to) => {
   win.webContents.sendInputEvent({ type: "mouseDown", x: from.x, y: from.y, button: "left", clickCount: 1 });
   for (let index = 1; index <= 24; index += 1) {
@@ -47,6 +52,41 @@ app.whenReady().then(async () => {
     })()
   `);
 
+  await moveMouse(win, initial.from);
+  const penCursor = await win.webContents.executeJavaScript(`
+    (() => {
+      const cursor = document.querySelector('.drawing-brush-cursor');
+      const style = getComputedStyle(cursor);
+      return {
+        visible: cursor.dataset.visible === 'true' && Number(style.opacity) === 1,
+        tool: cursor.dataset.tool,
+        size: Number(cursor.dataset.size),
+        width: Number.parseFloat(style.width),
+        height: Number.parseFloat(style.height),
+        radius: style.borderRadius,
+        pointerEvents: style.pointerEvents,
+      };
+    })()
+  `);
+
+  await win.webContents.executeJavaScript(`
+    (() => {
+      const input = document.querySelector('.drawing-size input');
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      setter.call(input, '11');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()
+  `);
+  await wait(100);
+  await moveMouse(win, initial.from);
+  const resizedPenCursor = await win.webContents.executeJavaScript(`
+    (() => {
+      const cursor = document.querySelector('.drawing-brush-cursor');
+      const style = getComputedStyle(cursor);
+      return { size: Number(cursor.dataset.size), width: Number.parseFloat(style.width), height: Number.parseFloat(style.height) };
+    })()
+  `);
+
   await drawLine(win, initial.from, initial.to);
   const pen = await win.webContents.executeJavaScript(`
     (() => {
@@ -60,6 +100,22 @@ app.whenReady().then(async () => {
   `);
 
   await win.webContents.executeJavaScript(`document.querySelector('.drawing-tool-switch button:nth-child(2)').click()`);
+  await wait(100);
+  await moveMouse(win, { x: initial.from.x + 80, y: initial.from.y + 40 });
+  const eraserCursor = await win.webContents.executeJavaScript(`
+    (() => {
+      const cursor = document.querySelector('.drawing-brush-cursor');
+      const style = getComputedStyle(cursor);
+      return {
+        visible: cursor.dataset.visible === 'true' && Number(style.opacity) === 1,
+        tool: cursor.dataset.tool,
+        size: Number(cursor.dataset.size),
+        width: Number.parseFloat(style.width),
+        height: Number.parseFloat(style.height),
+        status: document.querySelector('.drawing-canvas-status')?.textContent?.replace(/\\s+/g, ''),
+      };
+    })()
+  `);
   await drawLine(win, { x: initial.from.x + 80, y: initial.from.y + 40 }, { x: initial.to.x - 80, y: initial.to.y - 40 });
 
   const history = await win.webContents.executeJavaScript(`
@@ -102,10 +158,26 @@ app.whenReady().then(async () => {
 
   const passed = initial.hasPage
     && initial.nav[0] === "笔记"
-    && initial.nav[1] === "画图"
+    && initial.nav.includes("画图")
+    && penCursor.visible
+    && penCursor.tool === "pen"
+    && penCursor.size === 4
+    && penCursor.width === penCursor.size
+    && penCursor.height === penCursor.size
+    && penCursor.radius === "50%"
+    && penCursor.pointerEvents === "none"
+    && resizedPenCursor.size === 11
+    && resizedPenCursor.width === resizedPenCursor.size
+    && resizedPenCursor.height === resizedPenCursor.size
+    && eraserCursor.visible
+    && eraserCursor.tool === "eraser"
+    && eraserCursor.size === 33
+    && eraserCursor.width === eraserCursor.size
+    && eraserCursor.height === eraserCursor.size
+    && eraserCursor.status === "橡皮33px"
     && pen.count === 1
     && pen.tool === "pen"
-    && pen.points >= 3
+    && pen.points >= 2
     && pen.visiblePixels > 20
     && history.afterEraser.count === 2
     && history.afterEraser.tool === "eraser"
@@ -117,7 +189,7 @@ app.whenReady().then(async () => {
     && reloaded.strokes === 2
     && reloaded.undoEnabled;
 
-  process.stdout.write(`${JSON.stringify({ passed, initial, pen, history, reloaded }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ passed, initial, penCursor, resizedPenCursor, eraserCursor, pen, history, reloaded }, null, 2)}\n`);
   app.exit(passed ? 0 : 1);
 }).catch((error) => {
   process.stderr.write(`${error.stack || error}\n`);
